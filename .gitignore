@@ -1,8 +1,6 @@
 node_modules/
 dist/
 .env
-.last_post_id
-.last_github_release_id
 .DS_Store
 .idea/
 coverage/
