@@ -1,0 +1,30 @@
+{
+  "name": "smm-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file=.env dist/index.js",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.0.1",
+    "@types/node-cron": "^3.0.11",
+    "eslint": "^9.39.4",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.0"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.9.3",
+    "node-cron": "^4.5.0",
+    "winston": "^3.19.0"
+  }
+}
