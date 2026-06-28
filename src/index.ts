@@ -6,30 +6,28 @@ import { postToLinkedIn } from './services/linkedinService';
 import { getLatestRssPost, hasPostBeenPublished, markPostAsPublished } from './services/rssService';
 import { getLatestReleaseEvent, hasReleaseBeenPublished, markReleaseAsPublished } from './services/githubService';
 
-const publishContent = async (content: string, config: any, linkUrl?: string) => {
+const publishContent = async (contents: { facebook: string | null, linkedin: string | null }, config: any, linkUrl?: string) => {
   if (process.env.DRY_RUN === 'true') {
-    logger.info(`\n\n====== [DRY RUN MODE] GENERATED SOCIAL MEDIA POST ======\n\n${content}\n\n========================================================\n`);
+    logger.info(`\n\n====== [DRY RUN MODE] GENERATED FACEBOOK POST ======\n\n${contents.facebook}\n\n========================================================\n`);
+    logger.info(`\n\n====== [DRY RUN MODE] GENERATED LINKEDIN POST ======\n\n${contents.linkedin}\n\n========================================================\n`);
     return 1; // Return fake success to indicate the workflow succeeded
   }
 
   let successCount = 0;
 
-  if (config.facebookPageId && config.facebookAccessToken) {
-    const fbSuccess = await postToFacebook(content, config.facebookPageId, config.facebookAccessToken, linkUrl);
+  if (config.facebookPageId && config.facebookAccessToken && contents.facebook) {
+    const fbSuccess = await postToFacebook(contents.facebook, config.facebookPageId, config.facebookAccessToken, linkUrl);
     if (fbSuccess) successCount++;
   } else {
     logger.info("Skipping Facebook: Credentials not configured.");
   }
 
-  // Temporarily paused for testing
-  /*
-  if (config.linkedinUserId && config.linkedinAccessToken) {
-    const liProfileSuccess = await postToLinkedIn(content, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken);
+  if (config.linkedinUserId && config.linkedinAccessToken && contents.linkedin) {
+    const liProfileSuccess = await postToLinkedIn(contents.linkedin, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken);
     if (liProfileSuccess) successCount++;
   } else {
-    logger.info("Skipping LinkedIn Profile: Credentials not configured.");
+    logger.info("Skipping LinkedIn Profile: Credentials not configured or content empty.");
   }
-  */
 
   return successCount;
 };
@@ -52,10 +50,11 @@ const pollBlogRss = async () => {
   logger.info(`Found NEW blog post: ${latestPost.title}`);
   const prompt = `Write a social media post promoting my new blog article titled: "${latestPost.title}". Here is the link to append at the end: ${latestPost.link}`;
   
-  const content = await generatePostContent('blog', prompt, config.geminiApiKey, config.groqApiKey);
-  if (!content) return;
+  const fbContent = await generatePostContent('blog', 'facebook', prompt, config.geminiApiKey, config.groqApiKey);
+  const liContent = await generatePostContent('blog', 'linkedin', prompt, config.geminiApiKey, config.groqApiKey);
+  if (!fbContent && !liContent) return;
 
-  const platformsCount = await publishContent(content, config, latestPost.link);
+  const platformsCount = await publishContent({ facebook: fbContent, linkedin: liContent }, config, latestPost.link);
   
   if (platformsCount > 0) {
     markPostAsPublished(latestPost.id);
@@ -93,10 +92,11 @@ ${latestRelease.body}
 
 Link to append at the end: ${latestRelease.htmlUrl}`;
   
-  const content = await generatePostContent(sourceType, prompt, config.geminiApiKey, config.groqApiKey);
-  if (!content) return;
+  const fbContent = await generatePostContent(sourceType, 'facebook', prompt, config.geminiApiKey, config.groqApiKey);
+  const liContent = await generatePostContent(sourceType, 'linkedin', prompt, config.geminiApiKey, config.groqApiKey);
+  if (!fbContent && !liContent) return;
 
-  const platformsCount = await publishContent(content, config, latestRelease.htmlUrl);
+  const platformsCount = await publishContent({ facebook: fbContent, linkedin: liContent }, config, latestRelease.htmlUrl);
   
   if (platformsCount > 0) {
     markReleaseAsPublished(latestRelease.htmlUrl);

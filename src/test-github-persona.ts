@@ -23,11 +23,11 @@ Major update!
 Link to append at the end: https://github.com/jessn-dev/jobDork/releases/tag/v2.1.0`;
 
   logger.info("=== TESTING GITHUB NEW PROJECT PERSONA ===");
-  const newPost = await generatePostContent('github_new', mockNewRelease, config.geminiApiKey, config.groqApiKey);
+  const newPost = await generatePostContent('github_new', 'facebook', mockNewRelease, config.geminiApiKey, config.groqApiKey);
   console.log(`\n${newPost}\n`);
 
   logger.info("=== TESTING GITHUB UPDATE PERSONA ===");
-  const updatePost = await generatePostContent('github_update', mockUpdateRelease, config.geminiApiKey, config.groqApiKey);
+  const updatePost = await generatePostContent('github_update', 'facebook', mockUpdateRelease, config.geminiApiKey, config.groqApiKey);
   console.log(`\n${updatePost}\n`);
 };
 

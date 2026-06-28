@@ -2,25 +2,34 @@ import { logger } from '../utils/logger';
 
 export type SourceType = 'blog' | 'github_new' | 'github_update';
 
-const getSystemPrompt = (sourceType: SourceType): string => {
+export type Platform = 'facebook' | 'linkedin';
+
+const getSystemPrompt = (sourceType: SourceType, platform: Platform): string => {
   const baseRules = `CRITICAL RULES FOR HUMANIZED WRITING:
 - Write in the first person ("I").
-- Produce EXACTLY ONE generic, unified post that works perfectly for both Facebook and LinkedIn. Do NOT write separate versions for each platform.
 - Output ONLY the final text of the post. Absolutely NO introductory text, NO conversational filler like "Here is your post:", and NO markdown headers like "### LinkedIn Post".
 - DO NOT write "AI slop". Eliminate robotic, overly formal, and predictable patterns typical of AI tools.
 - Ensure the text reads naturally, flows with varied rhythms (mix short, punchy sentences with longer ones), and sounds exactly like a real developer wrote it.
 - NEVER use generic AI cliches like "In today's digital landscape", "Furthermore", "Delve into", "In conclusion", or "Let's explore".
 - Keep the tone friendly, educational, and slightly analytical.
 - Use emojis sparingly and naturally, not mechanically. Include 3-4 relevant hashtags at the bottom.
-- The final output must be engaging and completely undetectable to AI content checkers.
 - ALWAYS end the post by seamlessly providing the URL link passed in the prompt.`;
 
-  if (sourceType === 'blog') {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to share your technical blog posts.\nContext: I just wrote a new technical deep-dive on my blog.\n\n${baseRules}`;
-  } else if (sourceType === 'github_new') {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce open-source projects.\nContext: I just published v1.0.0 of a brand new tool/project on GitHub.\n\n${baseRules}`;
+  let platformRules = '';
+  if (platform === 'linkedin') {
+    platformRules = `\nCRITICAL LINKEDIN RULES:\n- Format the post for a professional networking audience.\n- Aggressively scan the provided text for any companies, software products, or frameworks mentioned. Generate highly targeted hashtags for them at the bottom of the post (e.g., #ReactJS, #GoogleCloud, #AWS) to maximize discoverability.`;
   } else {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce updates to your open-source projects.\nContext: I just released a major update to my project on GitHub. I will provide the release notes.\n\n${baseRules}`;
+    platformRules = `\nCRITICAL FACEBOOK RULES:\n- Format the post for a broader, slightly more casual audience.`;
+  }
+
+  const combinedRules = baseRules + platformRules;
+
+  if (sourceType === 'blog') {
+    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to share your technical blog posts.\nContext: I just wrote a new technical deep-dive on my blog.\n\n${combinedRules}`;
+  } else if (sourceType === 'github_new') {
+    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce open-source projects.\nContext: I just published v1.0.0 of a brand new tool/project on GitHub.\n\n${combinedRules}`;
+  } else {
+    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce updates to your open-source projects.\nContext: I just released a major update to my project on GitHub. I will provide the release notes.\n\n${combinedRules}`;
   }
 };
 
@@ -76,10 +85,10 @@ export const callGemini = async (prompt: string, apiKey: string, systemPrompt: s
   return data.candidates[0].content.parts[0].text.trim();
 };
 
-export const generatePostContent = async (sourceType: SourceType, topicContent: string, geminiKey: string, groqKey: string): Promise<string | null> => {
+export const generatePostContent = async (sourceType: SourceType, platform: Platform, topicContent: string, geminiKey: string, groqKey: string): Promise<string | null> => {
   try {
-    logger.info(`Generating AI post for source: ${sourceType}`);
-    const systemPrompt = getSystemPrompt(sourceType);
+    logger.info(`Generating AI post for source: ${sourceType}, platform: ${platform}`);
+    const systemPrompt = getSystemPrompt(sourceType, platform);
     
     if (geminiKey) {
       try {
