@@ -44,7 +44,7 @@ const pollBlogRss = async () => {
     return;
   }
 
-  if (hasPostBeenPublished(latestPost.link)) {
+  if (hasPostBeenPublished(latestPost.id)) {
     logger.info(`Blog post already published: ${latestPost.title}`);
     return;
   }
@@ -58,7 +58,7 @@ const pollBlogRss = async () => {
   const platformsCount = await publishContent(content, config, latestPost.link);
   
   if (platformsCount > 0) {
-    markPostAsPublished(latestPost.link);
+    markPostAsPublished(latestPost.id);
     logger.info(`Successfully marked blog post as published: ${latestPost.title}`);
   }
 };
