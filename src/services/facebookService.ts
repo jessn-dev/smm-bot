@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 
-export const postToFacebook = async (message: string, pageId: string, accessToken: string): Promise<boolean> => {
+export const postToFacebook = async (message: string, pageId: string, accessToken: string, linkUrl?: string): Promise<boolean> => {
   if (!pageId || !accessToken) {
     logger.warn('Facebook credentials missing. Skipping Facebook post.');
     return false;
@@ -12,6 +12,7 @@ export const postToFacebook = async (message: string, pageId: string, accessToke
     
     const params = new URLSearchParams();
     params.append('message', message);
+    if (linkUrl) params.append('link', linkUrl);
     params.append('access_token', accessToken);
 
     const res = await fetch(url, {

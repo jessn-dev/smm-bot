@@ -6,7 +6,7 @@ import { postToLinkedIn } from './services/linkedinService';
 import { getLatestRssPost, hasPostBeenPublished, markPostAsPublished } from './services/rssService';
 import { getLatestReleaseEvent, hasReleaseBeenPublished, markReleaseAsPublished } from './services/githubService';
 
-const publishContent = async (content: string, config: any) => {
+const publishContent = async (content: string, config: any, linkUrl?: string) => {
   if (process.env.DRY_RUN === 'true') {
     logger.info(`\n\n====== [DRY RUN MODE] GENERATED SOCIAL MEDIA POST ======\n\n${content}\n\n========================================================\n`);
     return 1; // Return fake success to indicate the workflow succeeded
@@ -15,7 +15,7 @@ const publishContent = async (content: string, config: any) => {
   let successCount = 0;
 
   if (config.facebookPageId && config.facebookAccessToken) {
-    const fbSuccess = await postToFacebook(content, config.facebookPageId, config.facebookAccessToken);
+    const fbSuccess = await postToFacebook(content, config.facebookPageId, config.facebookAccessToken, linkUrl);
     if (fbSuccess) successCount++;
   } else {
     logger.info("Skipping Facebook: Credentials not configured.");
@@ -55,7 +55,7 @@ const pollBlogRss = async () => {
   const content = await generatePostContent('blog', prompt, config.geminiApiKey, config.groqApiKey);
   if (!content) return;
 
-  const platformsCount = await publishContent(content, config);
+  const platformsCount = await publishContent(content, config, latestPost.link);
   
   if (platformsCount > 0) {
     markPostAsPublished(latestPost.link);
@@ -96,7 +96,7 @@ Link to append at the end: ${latestRelease.htmlUrl}`;
   const content = await generatePostContent(sourceType, prompt, config.geminiApiKey, config.groqApiKey);
   if (!content) return;
 
-  const platformsCount = await publishContent(content, config);
+  const platformsCount = await publishContent(content, config, latestRelease.htmlUrl);
   
   if (platformsCount > 0) {
     markReleaseAsPublished(latestRelease.htmlUrl);
