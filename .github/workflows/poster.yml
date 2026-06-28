@@ -46,8 +46,9 @@ jobs:
         git config --global user.name "SMM Bot Action"
         git config --global user.email "smm-bot-action@users.noreply.github.com"
         
-        # Add the state files if they exist
-        git add .last_post_id .last_github_release_id || true
+        # Add the state files individually to prevent fatal errors if one is missing
+        git add .last_post_id 2>/dev/null || true
+        git add .last_github_release_id 2>/dev/null || true
         
         # Check if there are any changes to commit
         if ! git diff --staged --quiet; then
