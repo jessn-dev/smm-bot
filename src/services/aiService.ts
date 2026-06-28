@@ -33,7 +33,7 @@ export const callGroq = async (prompt: string, apiKey: string, systemPrompt: str
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'llama3-70b-8192',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
@@ -48,16 +48,28 @@ export const callGroq = async (prompt: string, apiKey: string, systemPrompt: str
 
 export const callGemini = async (prompt: string, apiKey: string, systemPrompt: string): Promise<string> => {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
+    },
+    contents: [{ parts: [{ text: prompt }] }]
+  };
+
+  let res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: systemPrompt }]
-      },
-      contents: [{ parts: [{ text: prompt }] }]
-    })
+    body: JSON.stringify(payload)
   });
+
+  if (res.status === 429) {
+    logger.warn("Gemini API rate limit (429) reached. Waiting 90 seconds for quota to reset before retrying...");
+    await new Promise(resolve => setTimeout(resolve, 90000));
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || `Gemini API error: ${res.status}`);
