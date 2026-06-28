@@ -23,7 +23,7 @@ const publishContent = async (contents: { facebook: string | null, linkedin: str
   }
 
   if (config.linkedinUserId && config.linkedinAccessToken && contents.linkedin) {
-    const liProfileSuccess = await postToLinkedIn(contents.linkedin, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken);
+    const liProfileSuccess = await postToLinkedIn(contents.linkedin, `urn:li:member:${config.linkedinUserId}`, config.linkedinAccessToken);
     if (liProfileSuccess) successCount++;
   } else {
     logger.info("Skipping LinkedIn Profile: Credentials not configured or content empty.");
