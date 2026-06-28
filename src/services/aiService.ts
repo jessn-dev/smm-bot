@@ -5,6 +5,8 @@ export type SourceType = 'blog' | 'github_new' | 'github_update';
 const getSystemPrompt = (sourceType: SourceType): string => {
   const baseRules = `CRITICAL RULES FOR HUMANIZED WRITING:
 - Write in the first person ("I").
+- Produce EXACTLY ONE generic, unified post that works perfectly for both Facebook and LinkedIn. Do NOT write separate versions for each platform.
+- Output ONLY the final text of the post. Absolutely NO introductory text, NO conversational filler like "Here is your post:", and NO markdown headers like "### LinkedIn Post".
 - DO NOT write "AI slop". Eliminate robotic, overly formal, and predictable patterns typical of AI tools.
 - Ensure the text reads naturally, flows with varied rhythms (mix short, punchy sentences with longer ones), and sounds exactly like a real developer wrote it.
 - NEVER use generic AI cliches like "In today's digital landscape", "Furthermore", "Delve into", "In conclusion", or "Let's explore".

@@ -21,12 +21,15 @@ const publishContent = async (content: string, config: any) => {
     logger.info("Skipping Facebook: Credentials not configured.");
   }
 
+  // Temporarily paused for testing
+  /*
   if (config.linkedinUserId && config.linkedinAccessToken) {
     const liProfileSuccess = await postToLinkedIn(content, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken);
     if (liProfileSuccess) successCount++;
   } else {
     logger.info("Skipping LinkedIn Profile: Credentials not configured.");
   }
+  */
 
   return successCount;
 };
