@@ -1,4 +1,3 @@
-import cron from 'node-cron';
 import { getConfig } from './config';
 import { logger } from './utils/logger';
 import { generatePostContent, SourceType } from './services/aiService';
@@ -109,28 +108,19 @@ Link to append at the end: ${latestRelease.htmlUrl}`;
   }
 };
 
-const run = () => {
-  logger.info("Starting SMM-Bot Daemon...");
+const run = async () => {
+  logger.info("Starting Serverless SMM-Bot Run...");
   
-  // Blog Poller: Sun, Tue, Thu, Sat at 13:05 UTC
-  cron.schedule('5 13 * * 0,2,4,6', () => {
-    pollBlogRss().catch(err => logger.error(`Blog poller error: ${err.message}`));
-  });
-  logger.info("Blog Poller scheduled for 13:05 UTC on Sun, Tue, Thu, Sat.");
-
-  // GitHub Poller: Every day at 14:00 UTC
-  cron.schedule('0 14 * * *', () => {
-    pollGithubReleases().catch(err => logger.error(`GitHub poller error: ${err.message}`));
-  });
-  logger.info("GitHub Poller scheduled for 14:00 UTC daily.");
-  
-  // To allow for immediate testing, we can trigger them once on startup if an env flag is passed.
-  if (process.env.RUN_ON_STARTUP === 'true') {
-    logger.info("RUN_ON_STARTUP flag detected. Running pollers immediately...");
-    pollBlogRss();
-    pollGithubReleases();
+  try {
+    await pollBlogRss();
+    await pollGithubReleases();
+    logger.info("Serverless run completed successfully.");
+    process.exit(0);
+  } catch (error) {
+    logger.error(`Critical error during execution: ${(error as Error).message}`);
+    process.exit(1);
   }
 };
 
-// Start the daemon
+// Start the script
 run();

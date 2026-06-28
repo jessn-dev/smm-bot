@@ -1,19 +1,26 @@
-name: CI Pipeline
+name: Social Media Publisher
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  schedule:
+    # Blog Poller: Sun, Tue, Thu, Sat at 13:05 UTC
+    - cron: '5 13 * * 0,2,4,6'
+    # GitHub Poller: Every day at 14:00 UTC
+    - cron: '0 14 * * *'
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Crucial: allows the action to push commits back to the repo
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
     
-    - name: Use Node.js 22
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22'
@@ -23,3 +30,31 @@ jobs:
       
     - name: Build Project
       run: npm run build
+
+    - name: Run SMM Bot
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+        FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
+        LINKEDIN_COMPANY_ID: ${{ secrets.LINKEDIN_COMPANY_ID }}
+        LINKEDIN_USER_ID: ${{ secrets.LINKEDIN_USER_ID }}
+        LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+      run: npm start
+
+    - name: Save Bot Memory State (Amnesia Protection)
+      run: |
+        git config --global user.name "SMM Bot Action"
+        git config --global user.email "smm-bot-action@users.noreply.github.com"
+        
+        # Add the state files if they exist
+        git add .last_post_id .last_github_release_id || true
+        
+        # Check if there are any changes to commit
+        if ! git diff --staged --quiet; then
+          git commit -m "chore: persist published state ids [skip ci]"
+          git push
+          echo "Successfully pushed updated memory state to repository."
+        else
+          echo "No new publications. Memory state remains unchanged."
+        fi
