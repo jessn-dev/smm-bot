@@ -37,7 +37,6 @@ jobs:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
         FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
-        LINKEDIN_COMPANY_ID: ${{ secrets.LINKEDIN_COMPANY_ID }}
         LINKEDIN_USER_ID: ${{ secrets.LINKEDIN_USER_ID }}
         LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
       run: node dist/index.js

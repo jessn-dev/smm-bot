@@ -28,13 +28,6 @@ const publishContent = async (content: string, config: any) => {
     logger.info("Skipping LinkedIn Profile: Credentials not configured.");
   }
 
-  if (config.linkedinCompanyId && config.linkedinAccessToken) {
-    const liCompanySuccess = await postToLinkedIn(content, `urn:li:organization:${config.linkedinCompanyId}`, config.linkedinAccessToken);
-    if (liCompanySuccess) successCount++;
-  } else {
-    logger.info("Skipping LinkedIn Company Page: Credentials not configured.");
-  }
-
   return successCount;
 };
 

@@ -7,7 +7,8 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
   }
 
   try {
-    logger.info('Posting to LinkedIn Profile...');
+    const isCompany = authorUrn.includes('organization');
+    logger.info(`Posting to LinkedIn ${isCompany ? 'Company Page' : 'Profile'}...`);
     const url = 'https://api.linkedin.com/v2/ugcPosts';
     
     const payload = {
