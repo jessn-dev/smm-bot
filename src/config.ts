@@ -2,7 +2,6 @@ export interface AppConfig {
   facebookPageId: string;
   facebookAccessToken: string;
   linkedinUserId: string;
-  linkedinCompanyId: string;
   linkedinAccessToken: string;
   geminiApiKey: string;
   groqApiKey: string;
