@@ -15,7 +15,7 @@ const getSystemPrompt = (sourceType: SourceType, platform: Platform): string => 
 - Use emojis sparingly and naturally, not mechanically. Include 3-4 relevant hashtags at the bottom.
 - ALWAYS end the post by seamlessly providing the URL link passed in the prompt.`;
 
-  let platformRules = '';
+  let platformRules: string;
   if (platform === 'linkedin') {
     platformRules = `\nCRITICAL LINKEDIN RULES:\n- Format the post for a professional networking audience.\n- Aggressively scan the provided text for any companies, software products, or frameworks mentioned. Generate highly targeted hashtags for them at the bottom of the post (e.g., #ReactJS, #GoogleCloud, #AWS) to maximize discoverability.`;
   } else {
@@ -70,14 +70,27 @@ export const callGemini = async (prompt: string, apiKey: string, systemPrompt: s
     body: JSON.stringify(payload)
   });
 
-  if (res.status === 429) {
-    logger.warn("Gemini API rate limit (429) reached. Waiting 90 seconds for quota to reset before retrying...");
-    await new Promise(resolve => setTimeout(resolve, 90000));
+  const maxRetries = 4;
+  let baseWaitTimeMs = 2000; // Start with 2 seconds
+  let retries = 0;
+
+  while (res.status === 429 && retries < maxRetries) {
+    // Add up to 1 second of random jitter
+    const jitter = Math.random() * 1000;
+    const waitTime = baseWaitTimeMs + jitter;
+    
+    logger.warn(`Gemini API rate limit (429) reached. Retrying in ${(waitTime / 1000).toFixed(1)} seconds... (Attempt ${retries + 1}/${maxRetries})`);
+    
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+    
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    baseWaitTimeMs *= 2; // Exponential backoff (2s, 4s, 8s, 16s...)
+    retries++;
   }
 
   const data = await res.json();

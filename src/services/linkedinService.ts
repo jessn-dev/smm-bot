@@ -9,22 +9,19 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
   try {
     const isCompany = authorUrn.includes('organization');
     logger.info(`Posting to LinkedIn ${isCompany ? 'Company Page' : 'Profile'}...`);
-    const url = 'https://api.linkedin.com/v2/ugcPosts';
+    const url = 'https://api.linkedin.com/rest/posts';
     
     const payload = {
       author: authorUrn,
-      lifecycleState: 'PUBLISHED',
-      specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: {
-            text: message
-          },
-          shareMediaCategory: 'NONE'
-        }
+      commentary: message,
+      visibility: 'PUBLIC',
+      distribution: {
+        feedDistribution: 'MAIN_FEED',
+        targetEntities: [],
+        thirdPartyDistributionChannels: []
       },
-      visibility: {
-        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
-      }
+      lifecycleState: 'PUBLISHED',
+      isReshareDisabledByAuthor: false
     };
 
     const res = await fetch(url, {
@@ -32,6 +29,7 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        'LinkedIn-Version': '202605',
         'X-Restli-Protocol-Version': '2.0.0'
       },
       body: JSON.stringify(payload)
