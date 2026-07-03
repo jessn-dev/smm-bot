@@ -8,6 +8,17 @@ on:
     - cron: '5 13 * * 0,2,4,6'
     # GitHub Poller: Every day at 14:00 UTC
     - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Which pollers to run'
+        type: choice
+        default: all
+        options: [all, blog, github]
+      dry_run:
+        description: 'Generate posts but do not publish'
+        type: boolean
+        default: false
 
 jobs:
   publish:
@@ -41,9 +52,10 @@ jobs:
         LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
         TARGET_REPOS: ${{ vars.TARGET_REPOS }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Route each trigger to its poller. 13:05 -> blog, 14:00 -> github,
-        # a manual push -> everything.
-        RUN_MODE: ${{ github.event.schedule == '5 13 * * 0,2,4,6' && 'blog' || github.event.schedule == '0 14 * * *' && 'github' || 'all' }}
+        # Manual dispatch uses the chosen mode; the blog cron -> blog, the
+        # github cron -> github; anything else (push) -> everything.
+        RUN_MODE: ${{ inputs.mode || (github.event.schedule == '5 13 * * 0,2,4,6' && 'blog') || (github.event.schedule == '0 14 * * *' && 'github') || 'all' }}
+        DRY_RUN: ${{ inputs.dry_run || 'false' }}
       run: node dist/index.js
 
     - name: Save Bot Memory State (Amnesia Protection)
