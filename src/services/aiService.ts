@@ -90,8 +90,12 @@ export const callGroq = async (prompt: string, apiKey: string, systemPrompt: str
   return data.choices[0].message.content.trim();
 };
 
-export const callGemini = async (prompt: string, apiKey: string, systemPrompt: string): Promise<string> => {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+// Tried in order. If one is rate-limited (429) or errors, fall through to the
+// next before ever touching Groq. Each Gemini model has its own free quota.
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+
+const callGeminiModel = async (prompt: string, apiKey: string, systemPrompt: string, model: string): Promise<string> => {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const payload = {
     systemInstruction: {
       parts: [{ text: systemPrompt }]
@@ -99,38 +103,32 @@ export const callGemini = async (prompt: string, apiKey: string, systemPrompt: s
     contents: [{ parts: [{ text: prompt }] }]
   };
 
-  let res = await fetch(url, {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
-  const maxRetries = 4;
-  let baseWaitTimeMs = 2000; // Start with 2 seconds
-  let retries = 0;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || `Gemini ${model} error: ${res.status}`);
+  return data.candidates[0].content.parts[0].text.trim();
+};
 
-  while (res.status === 429 && retries < maxRetries) {
-    // Add up to 1 second of random jitter
-    const jitter = Math.random() * 1000;
-    const waitTime = baseWaitTimeMs + jitter;
-    
-    logger.warn(`Gemini API rate limit (429) reached. Retrying in ${(waitTime / 1000).toFixed(1)} seconds... (Attempt ${retries + 1}/${maxRetries})`);
-    
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-    
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+export const callGemini = async (prompt: string, apiKey: string, systemPrompt: string): Promise<string> => {
+  let lastError: Error | null = null;
 
-    baseWaitTimeMs *= 2; // Exponential backoff (2s, 4s, 8s, 16s...)
-    retries++;
+  for (const model of GEMINI_MODELS) {
+    try {
+      logger.info(`Trying Gemini model: ${model}`);
+      return await callGeminiModel(prompt, apiKey, systemPrompt, model);
+    } catch (error: unknown) {
+      lastError = error as Error;
+      logger.warn(`Gemini model ${model} failed: ${lastError.message}. Trying next model...`);
+    }
   }
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `Gemini API error: ${res.status}`);
-  return data.candidates[0].content.parts[0].text.trim();
+  // All Gemini models exhausted; let the caller fall back to Groq.
+  throw lastError ?? new Error('All Gemini models failed');
 };
 
 export const generatePostContent = async (sourceType: SourceType, platform: Platform, topicContent: string, geminiKey: string, groqKey: string): Promise<string | null> => {
