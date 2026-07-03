@@ -1,8 +1,30 @@
 import { logger } from '../utils/logger';
 
-export type SourceType = 'blog' | 'github_new' | 'github_update';
+export type SourceType =
+  | 'blog'
+  | 'github_new'
+  | 'github_major'
+  | 'github_minor'
+  | 'github_patch';
 
 export type Platform = 'facebook' | 'linkedin';
+
+/**
+ * Map a release to a post flavor. A repo's first-ever stable release is a
+ * launch; otherwise the trailing-zero shape of the semver tag tells us the
+ * bump magnitude (X.0.0 major, X.Y.0 minor, X.Y.Z patch).
+ */
+export const classifyRelease = (tagName: string, isFirstRelease: boolean): SourceType => {
+  if (isFirstRelease) return 'github_new';
+
+  const match = tagName.replace(/^v/i, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return 'github_minor'; // Unparseable tag: treat as a generic update.
+
+  const [, , minor, patch] = match;
+  if (Number(patch) > 0) return 'github_patch';
+  if (Number(minor) > 0) return 'github_minor';
+  return 'github_major'; // X.0.0
+};
 
 const getSystemPrompt = (sourceType: SourceType, platform: Platform): string => {
   const baseRules = `CRITICAL RULES FOR HUMANIZED WRITING:
@@ -24,13 +46,26 @@ const getSystemPrompt = (sourceType: SourceType, platform: Platform): string => 
 
   const combinedRules = baseRules + platformRules;
 
-  if (sourceType === 'blog') {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to share your technical blog posts.\nContext: I just wrote a new technical deep-dive on my blog.\n\n${combinedRules}`;
-  } else if (sourceType === 'github_new') {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce open-source projects.\nContext: I just published v1.0.0 of a brand new tool/project on GitHub.\n\n${combinedRules}`;
-  } else {
-    return `You are Jesse, a Software Engineer and Developer Advocate. You write social media posts for your personal LinkedIn and Facebook profiles to announce updates to your open-source projects.\nContext: I just released a major update to my project on GitHub. I will provide the release notes.\n\n${combinedRules}`;
-  }
+  const persona = `You are Jesse, a Software Engineer and Developer Advocate writing on your personal LinkedIn and Facebook.`;
+
+  const context: Record<SourceType, string> = {
+    blog: `Context: I just published a new technical deep-dive on my blog.
+Goal: Hook the reader with the core problem or insight, tease what they'll learn, and invite them to read the full article. Do not summarize the whole post — leave curiosity on the table.`,
+
+    github_new: `Context: I just shipped the FIRST public release of a brand-new open-source project on GitHub. This is a launch announcement.
+Goal: Explain in one or two lines what the project does and the pain it removes. Convey genuine builder excitement (not hype). Invite people to try it, star it, and give feedback. Lead with the problem it solves, not the version number.`,
+
+    github_major: `Context: I just shipped a MAJOR version of my open-source project (a X.0.0 release) — expect breaking changes and headline features.
+Goal: Lead with the single biggest change and why it matters. Briefly flag that it's a major version so users know to check for breaking changes/migration. Keep it energetic but honest.`,
+
+    github_minor: `Context: I just shipped a MINOR update to my open-source project (new features, backward compatible).
+Goal: Highlight the one or two most useful new features from the release notes and what they unlock for users. Keep it upbeat and concrete.`,
+
+    github_patch: `Context: I just shipped a PATCH release for my open-source project (bug fixes / small improvements, no new features).
+Goal: Keep it short and low-key. Note the key fixes or stability wins from the notes. Thank anyone who reported issues if relevant. Don't oversell a patch.`,
+  };
+
+  return `${persona}\n${context[sourceType]}\n\n${combinedRules}`;
 };
 
 export const callGroq = async (prompt: string, apiKey: string, systemPrompt: string): Promise<string> => {
@@ -118,8 +153,8 @@ export const generatePostContent = async (sourceType: SourceType, platform: Plat
       return await callGroq(topicContent, groqKey, systemPrompt);
     }
     
-    logger.warn("No AI API keys provided. Using raw topic as the post.");
-    return topicContent;
+    logger.warn("No AI API keys provided. Skipping post generation.");
+    return null;
   } catch (error: unknown) {
     const err = error as Error;
     logger.error(`AI generation failed: ${err.message}`);

@@ -1,0 +1,25 @@
+# Controls how GitHub's auto-generated release notes are grouped.
+# Categories match PR labels; commits/PRs without a listed label fall to "Other".
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot
+  categories:
+    - title: 🚀 Features
+      labels:
+        - feature
+        - enhancement
+    - title: 🐛 Fixes
+      labels:
+        - bug
+        - fix
+    - title: 🧹 Maintenance
+      labels:
+        - chore
+        - refactor
+        - dependencies
+    - title: 📝 Other Changes
+      labels:
+        - "*"

@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 
-export const postToLinkedIn = async (message: string, authorUrn: string, accessToken: string): Promise<boolean> => {
+export const postToLinkedIn = async (message: string, authorUrn: string, accessToken: string, linkUrl?: string): Promise<boolean> => {
   if (!authorUrn || !accessToken) {
     logger.warn('LinkedIn credentials missing. Skipping LinkedIn post.');
     return false;
@@ -10,8 +10,8 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
     const isCompany = authorUrn.includes('organization');
     logger.info(`Posting to LinkedIn ${isCompany ? 'Company Page' : 'Profile'}...`);
     const url = 'https://api.linkedin.com/rest/posts';
-    
-    const payload = {
+
+    const payload: Record<string, unknown> = {
       author: authorUrn,
       commentary: message,
       visibility: 'PUBLIC',
@@ -23,6 +23,16 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
       lifecycleState: 'PUBLISHED',
       isReshareDisabledByAuthor: false
     };
+
+    // Attach a link-preview card so the post renders a rich thumbnail
+    // instead of only the raw URL sitting in the text.
+    if (linkUrl) {
+      payload.content = {
+        article: {
+          source: linkUrl
+        }
+      };
+    }
 
     const res = await fetch(url, {
       method: 'POST',

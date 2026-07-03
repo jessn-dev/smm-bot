@@ -1,115 +1,147 @@
-import { getConfig } from './config';
+import { getConfig, AppConfig } from './config';
 import { logger } from './utils/logger';
-import { generatePostContent, SourceType } from './services/aiService';
+import { generatePostContent, classifyRelease, SourceType, Platform } from './services/aiService';
 import { postToFacebook } from './services/facebookService';
 import { postToLinkedIn } from './services/linkedinService';
-import { getLatestRssPost, hasPostBeenPublished, markPostAsPublished } from './services/rssService';
-import { getLatestReleaseEvent, hasReleaseBeenPublished, markReleaseAsPublished } from './services/githubService';
+import { getRssPosts, getPublishedPlatformsForPost, markPostPublishedOn } from './services/rssService';
+import { getLatestReleases, getPublishedPlatformsForRelease, markReleasePublishedOn } from './services/githubService';
 
-const publishContent = async (contents: { facebook: string | null, linkedin: string | null }, config: any, linkUrl?: string) => {
-  if (process.env.DRY_RUN === 'true') {
-    logger.info(`\n\n====== [DRY RUN MODE] GENERATED FACEBOOK POST ======\n\n${contents.facebook}\n\n========================================================\n`);
-    logger.info(`\n\n====== [DRY RUN MODE] GENERATED LINKEDIN POST ======\n\n${contents.linkedin}\n\n========================================================\n`);
-    return 1; // Return fake success to indicate the workflow succeeded
-  }
+type Mode = 'blog' | 'github' | 'all';
 
-  let successCount = 0;
+const PLATFORMS: Platform[] = ['facebook', 'linkedin'];
 
-  if (config.facebookPageId && config.facebookAccessToken && contents.facebook) {
-    const fbSuccess = await postToFacebook(contents.facebook, config.facebookPageId, config.facebookAccessToken, linkUrl);
-    if (fbSuccess) successCount++;
-  } else {
-    logger.info("Skipping Facebook: Credentials not configured.");
-  }
+const isDryRun = () => process.env.DRY_RUN === 'true';
 
-  if (config.linkedinUserId && config.linkedinAccessToken && contents.linkedin) {
-    const liProfileSuccess = await postToLinkedIn(contents.linkedin, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken);
-    if (liProfileSuccess) successCount++;
-  } else {
-    logger.info("Skipping LinkedIn Profile: Credentials not configured or content empty.");
-  }
-
-  return successCount;
+const isPlatformConfigured = (platform: Platform, config: AppConfig): boolean => {
+  return platform === 'facebook'
+    ? Boolean(config.facebookPageId && config.facebookAccessToken)
+    : Boolean(config.linkedinUserId && config.linkedinAccessToken);
 };
 
-const pollBlogRss = async () => {
+const postToPlatform = async (platform: Platform, content: string, config: AppConfig, linkUrl?: string): Promise<boolean> => {
+  return platform === 'facebook'
+    ? postToFacebook(content, config.facebookPageId, config.facebookAccessToken, linkUrl)
+    : postToLinkedIn(content, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken, linkUrl);
+};
+
+/**
+ * Publish one item to every platform it hasn't reached yet. State is tracked
+ * per platform, so a platform that failed last run is retried while a platform
+ * that already succeeded is skipped. Content is only generated for platforms
+ * that actually need it.
+ */
+const processItem = async (
+  sourceType: SourceType,
+  prompt: string,
+  linkUrl: string,
+  published: Set<string>,
+  config: AppConfig,
+  mark: (platform: Platform) => void
+): Promise<void> => {
+  for (const platform of PLATFORMS) {
+    if (published.has(platform)) {
+      logger.info(`Skipping ${platform}: already published for this item.`);
+      continue;
+    }
+    if (!isPlatformConfigured(platform, config)) {
+      logger.info(`Skipping ${platform}: credentials not configured.`);
+      continue;
+    }
+
+    const content = await generatePostContent(sourceType, platform, prompt, config.geminiApiKey, config.groqApiKey);
+    if (!content) {
+      logger.warn(`No content generated for ${platform}; will retry next run.`);
+      continue;
+    }
+
+    if (isDryRun()) {
+      logger.info(`\n\n====== [DRY RUN MODE] GENERATED ${platform.toUpperCase()} POST ======\n\n${content}\n\n========================================================\n`);
+      continue; // Never mark state in a dry run.
+    }
+
+    const ok = await postToPlatform(platform, content, config, linkUrl);
+    if (ok) {
+      mark(platform);
+      logger.info(`Published to ${platform}.`);
+    }
+  }
+};
+
+const pollBlogRss = async (config: AppConfig) => {
   logger.info("Polling Auto-Blogger RSS feed...");
-  const config = getConfig();
-  const latestPost = await getLatestRssPost();
-  
-  if (!latestPost) {
+  const posts = await getRssPosts();
+
+  if (posts.length === 0) {
     logger.warn("No RSS items found or feed unreachable.");
     return;
   }
 
-  if (hasPostBeenPublished(latestPost.id)) {
-    logger.info(`Blog post already published: ${latestPost.title}`);
+  // Oldest first so feed order is preserved when several need publishing.
+  const pending = posts
+    .map(post => ({ post, published: getPublishedPlatformsForPost(post.id) }))
+    .filter(({ published }) => !PLATFORMS.every(p => published.has(p)))
+    .reverse();
+
+  if (pending.length === 0) {
+    logger.info("No blog posts pending publication.");
     return;
   }
 
-  logger.info(`Found NEW blog post: ${latestPost.title}`);
-  const prompt = `Write a social media post promoting my new blog article titled: "${latestPost.title}". Here is the link to append at the end: ${latestPost.link}`;
-  
-  const fbContent = await generatePostContent('blog', 'facebook', prompt, config.geminiApiKey, config.groqApiKey);
-  const liContent = await generatePostContent('blog', 'linkedin', prompt, config.geminiApiKey, config.groqApiKey);
-  if (!fbContent && !liContent) return;
-
-  const platformsCount = await publishContent({ facebook: fbContent, linkedin: liContent }, config, latestPost.link);
-  
-  if (platformsCount > 0) {
-    markPostAsPublished(latestPost.id);
-    logger.info(`Successfully marked blog post as published: ${latestPost.title}`);
+  for (const { post, published } of pending) {
+    logger.info(`Processing blog post: ${post.title}`);
+    const prompt = `Write a social media post promoting my new blog article titled: "${post.title}". Here is the link to append at the end: ${post.link}`;
+    await processItem('blog', prompt, post.link, published, config, platform => markPostPublishedOn(post.id, platform));
   }
 };
 
-const pollGithubReleases = async () => {
-  logger.info("Polling GitHub for new Release Events...");
-  const config = getConfig();
-  const latestRelease = await getLatestReleaseEvent();
-  
-  if (!latestRelease) {
-    logger.info("No recent GitHub releases found.");
+const pollGithubReleases = async (config: AppConfig) => {
+  logger.info("Polling GitHub for new releases...");
+
+  if (config.githubTargetRepos.length === 0) {
+    logger.warn("No TARGET_REPOS configured. Skipping GitHub releases.");
     return;
   }
 
-  if (hasReleaseBeenPublished(latestRelease.htmlUrl)) {
-    logger.info(`GitHub release already published: ${latestRelease.tagName} for ${latestRelease.repoName}`);
+  const releases = await getLatestReleases(config.githubTargetRepos, config.githubToken);
+  const pending = releases
+    .map(release => ({ release, published: getPublishedPlatformsForRelease(release.htmlUrl) }))
+    .filter(({ published }) => !PLATFORMS.every(p => published.has(p)));
+
+  if (pending.length === 0) {
+    logger.info("No GitHub releases pending publication.");
     return;
   }
 
-  logger.info(`Found NEW GitHub release: ${latestRelease.repoName} ${latestRelease.tagName}`);
-  
-  // Semantic check: if it's 1.0.0, 0.1.0, 0.0.1, it's considered "new". Otherwise, it's an "update".
-  // A simple regex to catch v1.0.0 or 1.0.0
-  const isFirstRelease = /^v?(1\.0\.0|0\.\d+\.\d+)$/.test(latestRelease.tagName);
-  const sourceType: SourceType = isFirstRelease ? 'github_new' : 'github_update';
-  
-  const prompt = `Write a social media post about this GitHub release. 
-Repository: ${latestRelease.repoName}
-Version: ${latestRelease.tagName}
+  for (const { release, published } of pending) {
+    const sourceType = classifyRelease(release.tagName, release.isFirstRelease);
+    logger.info(`Processing GitHub release: ${release.repoName} ${release.tagName} (${sourceType})`);
+
+    const prompt = `Write a social media post about this GitHub release.
+Repository: ${release.repoName}
+Version: ${release.tagName}
 Release Notes:
-${latestRelease.body}
+${release.body}
 
-Link to append at the end: ${latestRelease.htmlUrl}`;
-  
-  const fbContent = await generatePostContent(sourceType, 'facebook', prompt, config.geminiApiKey, config.groqApiKey);
-  const liContent = await generatePostContent(sourceType, 'linkedin', prompt, config.geminiApiKey, config.groqApiKey);
-  if (!fbContent && !liContent) return;
+Link to append at the end: ${release.htmlUrl}`;
 
-  const platformsCount = await publishContent({ facebook: fbContent, linkedin: liContent }, config, latestRelease.htmlUrl);
-  
-  if (platformsCount > 0) {
-    markReleaseAsPublished(latestRelease.htmlUrl);
-    logger.info(`Successfully marked GitHub release as published: ${latestRelease.tagName}`);
+    await processItem(sourceType, prompt, release.htmlUrl, published, config, platform => markReleasePublishedOn(release.htmlUrl, platform));
   }
+};
+
+const resolveMode = (): Mode => {
+  const mode = (process.env.RUN_MODE || 'all').toLowerCase();
+  if (mode === 'blog' || mode === 'github') return mode;
+  return 'all';
 };
 
 const run = async () => {
-  logger.info("Starting Serverless SMM-Bot Run...");
-  
+  const mode = resolveMode();
+  logger.info(`Starting Serverless SMM-Bot Run (mode: ${mode})...`);
+  const config = getConfig();
+
   try {
-    await pollBlogRss();
-    await pollGithubReleases();
+    if (mode === 'blog' || mode === 'all') await pollBlogRss(config);
+    if (mode === 'github' || mode === 'all') await pollGithubReleases(config);
     logger.info("Serverless run completed successfully.");
     process.exit(0);
   } catch (error) {

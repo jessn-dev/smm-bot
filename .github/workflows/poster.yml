@@ -39,6 +39,11 @@ jobs:
         FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
         LINKEDIN_USER_ID: ${{ secrets.LINKEDIN_USER_ID }}
         LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        TARGET_REPOS: ${{ vars.TARGET_REPOS }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Route each trigger to its poller. 13:05 -> blog, 14:00 -> github,
+        # a manual push -> everything.
+        RUN_MODE: ${{ github.event.schedule == '5 13 * * 0,2,4,6' && 'blog' || github.event.schedule == '0 14 * * *' && 'github' || 'all' }}
       run: node dist/index.js
 
     - name: Save Bot Memory State (Amnesia Protection)
