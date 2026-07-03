@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 
-export const postToLinkedIn = async (message: string, authorUrn: string, accessToken: string, linkUrl?: string): Promise<boolean> => {
+export const postToLinkedIn = async (message: string, authorUrn: string, accessToken: string, linkUrl?: string, linkTitle?: string): Promise<boolean> => {
   if (!authorUrn || !accessToken) {
     logger.warn('LinkedIn credentials missing. Skipping LinkedIn post.');
     return false;
@@ -25,11 +25,13 @@ export const postToLinkedIn = async (message: string, authorUrn: string, accessT
     };
 
     // Attach a link-preview card so the post renders a rich thumbnail
-    // instead of only the raw URL sitting in the text.
-    if (linkUrl) {
+    // instead of only the raw URL sitting in the text. The LinkedIn API
+    // rejects an article without a title (HTTP 422), so require both.
+    if (linkUrl && linkTitle) {
       payload.content = {
         article: {
-          source: linkUrl
+          source: linkUrl,
+          title: linkTitle.slice(0, 400) // API caps the title length
         }
       };
     }

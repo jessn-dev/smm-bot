@@ -18,10 +18,10 @@ const isPlatformConfigured = (platform: Platform, config: AppConfig): boolean =>
     : Boolean(config.linkedinUserId && config.linkedinAccessToken);
 };
 
-const postToPlatform = async (platform: Platform, content: string, config: AppConfig, linkUrl?: string): Promise<boolean> => {
+const postToPlatform = async (platform: Platform, content: string, config: AppConfig, linkUrl?: string, linkTitle?: string): Promise<boolean> => {
   return platform === 'facebook'
     ? postToFacebook(content, config.facebookPageId, config.facebookAccessToken, linkUrl)
-    : postToLinkedIn(content, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken, linkUrl);
+    : postToLinkedIn(content, `urn:li:person:${config.linkedinUserId}`, config.linkedinAccessToken, linkUrl, linkTitle);
 };
 
 /**
@@ -34,6 +34,7 @@ const processItem = async (
   sourceType: SourceType,
   prompt: string,
   linkUrl: string,
+  linkTitle: string,
   published: Set<string>,
   config: AppConfig,
   mark: (platform: Platform) => void
@@ -59,7 +60,7 @@ const processItem = async (
       continue; // Never mark state in a dry run.
     }
 
-    const ok = await postToPlatform(platform, content, config, linkUrl);
+    const ok = await postToPlatform(platform, content, config, linkUrl, linkTitle);
     if (ok) {
       mark(platform);
       logger.info(`Published to ${platform}.`);
@@ -76,21 +77,24 @@ const pollBlogRss = async (config: AppConfig) => {
     return;
   }
 
-  // Oldest first so feed order is preserved when several need publishing.
+  // Only consider the newest few items. The feed carries full history, so
+  // looping every item would backfill the entire blog on first run.
+  const RECENT_LIMIT = 3;
   const pending = posts
+    .slice(0, RECENT_LIMIT)
     .map(post => ({ post, published: getPublishedPlatformsForPost(post.id) }))
     .filter(({ published }) => !PLATFORMS.every(p => published.has(p)))
-    .reverse();
+    .reverse(); // oldest of the recent set first, so feed order is preserved
 
   if (pending.length === 0) {
-    logger.info("No blog posts pending publication.");
+    logger.info("No recent blog posts pending publication.");
     return;
   }
 
   for (const { post, published } of pending) {
     logger.info(`Processing blog post: ${post.title}`);
     const prompt = `Write a social media post promoting my new blog article titled: "${post.title}". Here is the link to append at the end: ${post.link}`;
-    await processItem('blog', prompt, post.link, published, config, platform => markPostPublishedOn(post.id, platform));
+    await processItem('blog', prompt, post.link, post.title, published, config, platform => markPostPublishedOn(post.id, platform));
   }
 };
 
@@ -124,7 +128,8 @@ ${release.body}
 
 Link to append at the end: ${release.htmlUrl}`;
 
-    await processItem(sourceType, prompt, release.htmlUrl, published, config, platform => markReleasePublishedOn(release.htmlUrl, platform));
+    const releaseTitle = `${release.repoName} ${release.tagName}`;
+    await processItem(sourceType, prompt, release.htmlUrl, releaseTitle, published, config, platform => markReleasePublishedOn(release.htmlUrl, platform));
   }
 };
 
