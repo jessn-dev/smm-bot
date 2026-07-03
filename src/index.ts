@@ -8,7 +8,19 @@ import { getLatestReleases, getPublishedPlatformsForRelease, markReleasePublishe
 
 type Mode = 'blog' | 'github' | 'all';
 
-const PLATFORMS: Platform[] = ['facebook', 'linkedin'];
+const ALL_PLATFORMS: Platform[] = ['facebook', 'linkedin'];
+
+// Restrict targets with PLATFORMS env ("facebook", "linkedin", or "facebook,linkedin").
+// Empty/"all" -> every platform.
+const PLATFORMS: Platform[] = (() => {
+  const raw = (process.env.PLATFORMS || '').toLowerCase().trim();
+  if (!raw || raw === 'all') return ALL_PLATFORMS;
+  const picked = raw
+    .split(',')
+    .map(s => s.trim())
+    .filter((p): p is Platform => (ALL_PLATFORMS as string[]).includes(p));
+  return picked.length > 0 ? picked : ALL_PLATFORMS;
+})();
 
 const isDryRun = () => process.env.DRY_RUN === 'true';
 
@@ -141,7 +153,7 @@ const resolveMode = (): Mode => {
 
 const run = async () => {
   const mode = resolveMode();
-  logger.info(`Starting Serverless SMM-Bot Run (mode: ${mode})...`);
+  logger.info(`Starting Serverless SMM-Bot Run (mode: ${mode}, platforms: ${PLATFORMS.join(',')})...`);
   const config = getConfig();
 
   try {

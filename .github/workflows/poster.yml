@@ -11,10 +11,15 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Which pollers to run'
+        description: 'Which source to run (github = releases)'
         type: choice
         default: all
         options: [all, blog, github]
+      platforms:
+        description: 'Which platforms to publish to'
+        type: choice
+        default: all
+        options: [all, facebook, linkedin]
       dry_run:
         description: 'Generate posts but do not publish'
         type: boolean
@@ -55,6 +60,7 @@ jobs:
         # Manual dispatch uses the chosen mode; the blog cron -> blog, the
         # github cron -> github; anything else (push) -> everything.
         RUN_MODE: ${{ inputs.mode || (github.event.schedule == '5 13 * * 0,2,4,6' && 'blog') || (github.event.schedule == '0 14 * * *' && 'github') || 'all' }}
+        PLATFORMS: ${{ inputs.platforms || 'all' }}
         DRY_RUN: ${{ inputs.dry_run || 'false' }}
       run: node dist/index.js
 
