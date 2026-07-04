@@ -35,7 +35,20 @@ const getSystemPrompt = (sourceType: SourceType, platform: Platform): string => 
 - NEVER use generic AI cliches like "In today's digital landscape", "Furthermore", "Delve into", "In conclusion", or "Let's explore".
 - Keep the tone friendly, educational, and slightly analytical.
 - Use emojis sparingly and naturally, not mechanically. Include 3-4 relevant hashtags at the bottom.
-- ALWAYS end the post by seamlessly providing the URL link passed in the prompt.`;
+- ALWAYS end the post by seamlessly providing the URL link passed in the prompt.
+
+AVOID THESE AI TELLS (hard constraints):
+- NEVER use em dashes or en dashes (— or –). Use periods, commas, colons, or restructure the sentence.
+- Use straight quotes ('), never curly/smart quotes.
+- No signposting or announcements ("Let's dive in", "here's what you need to know", "buckle up").
+- No forced rule-of-three groupings (e.g. "faster, cleaner, and simpler").
+- No negative parallelism ("It's not just X, it's Y").
+- No aphorism formulas ("X is the Y of Z").
+- No manufactured punchlines or one-word staccato drama for effect.
+- No generic positive wrap-up sentence that adds nothing.
+- Prefer the verb "is" over hedges like "serves as", "acts as", "stands as".
+- No mechanical boldfacing of phrases and no Title Case Headings inside the post.
+- Drop filler: "in order to", "due to the fact that", "at the end of the day".`;
 
   let platformRules: string;
   if (platform === 'linkedin') {

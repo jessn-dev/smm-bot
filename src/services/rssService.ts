@@ -43,7 +43,11 @@ export const getRssPosts = async (): Promise<RssPost[]> => {
     if (!items) return [];
 
     const list = Array.isArray(items) ? items : [items];
-    return list.map(toRssPost);
+    // The feed is not guaranteed newest-first (it arrives oldest-first), so
+    // sort by pubDate descending to honor the newest-first contract callers rely on.
+    return list
+      .map(toRssPost)
+      .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
   } catch (error) {
     logger.error(`Error fetching RSS: ${(error as Error).message}`);
     return [];
